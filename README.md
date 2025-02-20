@@ -82,3 +82,7 @@ If you can ignore this, please skip this step.
 
 - Just power on.
 
+### Screenshot(upper side is DomA, bottom side is DomD)
+
+![](screenshot.jpg)
+
