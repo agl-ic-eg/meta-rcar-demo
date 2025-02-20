@@ -62,23 +62,10 @@ saveenv
    -  Setup TFTP server on your Host PC and copy full.img.gz into tftp root directory.
    - After setup network config on the board, execute 'run flash_xen_emmc' on U-Boot.
 
-### Fix Y-axis gap on touchscreen(it needs to run at once)
-
-This is caused by that Y-axis max set to 1440 but using 1920x1080 device.
-Touchpanel config file is sent to DomA and force to fix X-axis max to 1920 nad U-axis max to 1080.
-If you can ignore this, please skip this step.
-
-1. Setup ADB environment for DomA
-   - Setup network on your host PC to be able to connect DomA.
-     - Network routing configuration is required because DomA is behind the DomD and has no same subnet.
-   - Execute "adb connect 192.168.2.4:5555" on your host PC.
-   - After that, you can use adb command as same as using USB cable.
-2. Run misc/push_idc.sh to adjust touchscreen axis.
-   - DomA will be rebooted by this script.
-
 ## How to run Demo
 
 - Just power on.
+  - Note: Af first booting, DomA will be rebooted automatically. This is for push idc files to fix issue touchscreen axis.
 
 ### Screenshot(upper side is DomA, bottom side is DomD)
 
