@@ -1,0 +1,6 @@
+# ignore files
+/repo.zip
+/meta-xt-prod-devel-rcar-*
+/prebuilt_gsx
+/proprietary/*.zip
+

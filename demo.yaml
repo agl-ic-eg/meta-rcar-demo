@@ -1,0 +1,33 @@
+# parameters:
+  ENABLE_DEMO:
+    desc: "Add demo features"
+    "no":
+      desc: "Nothing to do"
+    "yes":
+      default: true
+      overrides:
+        components:
+          dom0:
+            builder:
+              layers:
+                - "../../../layers/meta-demo-dom0"
+        components:
+          domd:
+            sources:
+              - type: git
+                url: git://code.qt.io/yocto/meta-qt6.git
+                rev: 9bd2c2ae4b4fb536975904fe494813408a2282a3
+                # dev branch
+              - type: git
+                url: https://github.com/meta-qt5/meta-qt5.git
+                rev: eb828418264a49b8d00035cb3d7b12fcea3be801
+                # scrathgap branch
+            builder:
+              layers:
+                - "../../../layers/meta-demo-domd"
+                - "../meta-qt6"
+              conf:
+                - [IMAGE_INSTALL:append, " cluster-refgui"]
+                - [IMAGE_INSTALL:append, " ydotool"]
+                - [PACKAGECONFIG:append:pn_qtbase, " accessibility"]
+                #- [EXTRA_IMAGE_FEATURES:append ," read-only-rootfs"]
