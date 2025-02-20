@@ -28,6 +28,7 @@
                 - "../meta-qt6"
               conf:
                 - [IMAGE_INSTALL:append, " cluster-refgui"]
+                - [IMAGE_INSTALL:append, " android-tools install-idcfiles"]
                 - [IMAGE_INSTALL:append, " ydotool"]
                 - [PACKAGECONFIG:append:pn_qtbase, " accessibility"]
                 #- [EXTRA_IMAGE_FEATURES:append ," read-only-rootfs"]
