@@ -42,6 +42,9 @@ adb push tablet.idc /data/system/devices/idc/Vendor_0627_Product_0001.idc
 adb push wacom_fhd.idc /data/system/devices/idc/Wacom_Penpartner_Pen.idc
 adb shell chown system:system -R /data/system/devices
 adb shell chmod 644 -R /data/system/devices/idc/*.idc
+for apk in $(ls /usr/bin/apks/*.apk); do
+    adb install $apk
+done
 adb shell sync
 adb reboot
 
