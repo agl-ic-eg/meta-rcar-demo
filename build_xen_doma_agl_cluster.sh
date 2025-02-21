@@ -85,8 +85,12 @@ find yocto/common_data/sstate | grep xen: | xargs rm -r
 find yocto/common_data/sstate | grep arm-trusted-firmware: | xargs rm -r
 
 ninja
-ninja full.img.gz
-
+if [[ "$(pigz >/dev/null 2>&1; echo $?)" -eq 0 ]]; then
+    ninja image-full
+    pigz -k full.img
+else
+    ninja full.img.gz
+fi
 mkdir -p firmware
 find ./yocto/build-domd/tmp/deploy/images/ -name "*.srec" | xargs cp -t firmware
 
