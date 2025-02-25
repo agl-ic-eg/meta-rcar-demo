@@ -32,3 +32,35 @@
                 - [IMAGE_INSTALL:append, " ydotool"]
                 - [PACKAGECONFIG:append:pn_qtbase, " accessibility"]
                 #- [EXTRA_IMAGE_FEATURES:append ," read-only-rootfs"]
+  USING_GEN3E:
+    desc: "Using Gen3e SoC"
+    "no":
+      desc: "Nothing to do"
+    salvator-xs-m3-2x4g-gen3e:
+      overrides:
+        variables:
+          XT_DOMD_DTB_NAME: "r8a779m3-salvator-xs-2x4g-domd.dtb"
+          XT_XEN_DTB_NAME: "r8a779m3-salvator-xs-2x4g-xen.dtb"
+    salvator-xs-h3-4x2g-gen3e:
+      overrides:
+        variables:
+          XT_DOMD_DTB_NAME: "r8a779m1-salvator-xs-4x2g-domd.dtb"
+          XT_XEN_DTB_NAME: "r8a779m1-salvator-xs-4x2g-xen.dtb"
+    h3ulcb-4x2g-gen3e:
+      default: true
+      overrides:
+        variables:
+          XT_DOMD_DTB_NAME: "r8a779m1-h3ulcb-4x2g-domd.dtb"
+          XT_XEN_DTB_NAME: "r8a779m1-h3ulcb-4x2g-xen.dtb"
+    h3ulcb-4x2g-kf-gen3e:
+      overrides:
+        variables:
+          XT_DOMD_DTB_NAME: "r8a779m1-h3ulcb-4x2g-kf-domd.dtb"
+          XT_XEN_DTB_NAME: "r8a779m1-h3ulcb-4x2g-kf-xen.dtb"
+    h3ulcb-4x2g-ab-gen3e:
+      overrides:
+        variables:
+          XT_DOMD_DTB_NAME: "r8a779m1-h3ulcb-4x2g-ab-domd.dtb"
+          XT_XEN_DTB_NAME: "r8a779m1-h3ulcb-4x2g-ab-xen.dtb"
+
+

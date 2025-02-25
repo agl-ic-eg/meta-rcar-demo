@@ -28,15 +28,16 @@ CheckEvaluationPackage () {
     fi
 }
 Usage() {
-    echo "Usage: $0 <target_board>"
+    echo "Usage: $0 <target_board> <option>"
     echo "board list:"
     echo "- h3ulcb-4x2g-kf (h3sk 8GB + kingfisher board)"
     echo "- h3ulcb-4x2g-ab (h3sk 8GB + ccpf-sk board)"
     echo "- salvator-xs-h3-4x2g (Salvator-XS with H3 8GB)"
-    echo ""
+    echo "<option>"
+    echo "-e: Using Gen3e device"
     CheckEvaluationPackage;
 }
-if [[ $# -ne 1 ]]; then
+if [[ $# < 1 ]]; then
     Usage; exit -1
 fi
 if [[ $1 != "h3ulcb-4x2g-kf" ]] && 
@@ -44,6 +45,10 @@ if [[ $1 != "h3ulcb-4x2g-kf" ]] &&
     [[ $1 != "salvator-xs-h3-4x2g" ]]; then
     echo "Error: This board is not supported: $1"
     Usage; exit -1
+fi
+USING_GEN3E=""
+if [[ $2 == "-e" ]]; then
+    USING_GEN3E="--USING_GEN3E $1-gen3e"
 fi
 CheckEvaluationPackage;
 
@@ -78,6 +83,7 @@ moulin prod-devel-rcar-virtio.yaml \
     --ENABLE_ANDROID yes \
     --ENABLE_DOMU no \
     --GRAPHICS binaries \
+    ${USING_GEN3E}
 
 # Cleanup build directory
 rm -rf firmware
