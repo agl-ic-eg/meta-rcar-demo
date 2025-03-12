@@ -49,16 +49,14 @@ Directory structure:
    - I recomend to use https://github.com/morimoto/renesas-bsp-rom-writer. This is useful for flashing firmware.
 2. Setup U-boot
    - See also https://github.com/xen-troops/meta-xt-prod-devel-rcar/blob/master/doc/u-boot-env.md
+   - Execute following command to setup U-Boot environment variable(XXX is according to your environment).
 ```
-bootcmd=env delete bootargs; run bootcmd_emmc
-bootcmd_emmc=env delete bootargs; run emmc_xen_load; run emmc_dtb_load; run emmc_kernel_load; run emmc_xenpolicy_load; run emmc_initramfs_load; bootm 0x48080000 0x84000000 0x48000000
-mmc0_dtb_load=ext2load mmc 0:1 0x48000000 /boot/dom0.dtb; fdt addr 0x48000000; fdt resize; fdt mknode / boot_dev; fdt set /boot_dev device mmcblk1
-mmc0_initramfs_load=ext2load mmc 0:1 0x74000000 /boot/uInitramfs
-mmc0_kernel_load=ext2load mmc 0:1 0x7a000000 /boot/Image
-mmc0_xen_load=ext2load mmc 0:1 0x48080000 /boot/xen-uImage
-mmc0_xenpolicy_load=ext2load mmc 0:1 0x7c000000 /boot/xenpolicy
-flash_xen_emmc=tftp 0x500000000 full.img.gz; gzwrite mmc 1 0x500000000 ${filesize} 1000000 0
-initrd_high=0xffffffffffffffff
+env default -a
+setenv ipaddr 192.168.XXX.XXX
+setenv serverip 192.168.XXX.XXX
+setenv ethaddr '2e:09:0a:XX:XX:XX'
+setenv flash_xen_emmc 'tftp 0x500000000 full.img.gz; gzwrite mmc 1 0x500000000 ${filesize} 400000 0'
+saveenv
 ```
 3. Flash full.img.gz into eMMC
    -  Setup TFTP server on your Host PC and copy full.img.gz into tftp root directory.
