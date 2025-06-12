@@ -1,0 +1,9 @@
+[Match]
+Name=tsn0
+#KernelCommandLine=ip=dhcp
+[Network]
+#DHCP=yes
+Address=192.168.10.50
+[DHCP]
+CriticalConnection=true
+

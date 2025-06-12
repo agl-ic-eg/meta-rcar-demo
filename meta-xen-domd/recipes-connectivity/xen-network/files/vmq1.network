@@ -1,0 +1,7 @@
+[Match]
+Name=vmq1
+
+# Only for demonstration purposes
+[Network]
+Address=192.168.6.1/24
+

@@ -1,0 +1,41 @@
+From f11d9c2c041f68d9e548a0f84afc3e71c18f56a7 Mon Sep 17 00:00:00 2001
+From: Yuya Hamamachi <yuya.hamamachi.sx@renesas.com>
+Date: Thu, 6 Mar 2025 18:16:07 +0900
+Subject: [PATCH] DEBUG2
+
+Signed-off-by: Yuya Hamamachi <yuya.hamamachi.sx@renesas.com>
+---
+ xen/arch/arm/setup.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index 0726b17194..14c84b96e8 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -910,6 +910,11 @@ void __init start_xen(unsigned long boot_phys_offset,
+     smp_clear_cpu_maps();
+     //PROFILE_END();
+ 
++    PROFILE_START("preinit_xen_time");
++    preinit_xen_time();
++    PROFILE_END();
++    init_timer_flag = 1;
++
+     PROFILE_START("early_fdt_map");
+     device_tree_flattened = early_fdt_map(fdt_paddr);
+     if ( !device_tree_flattened )
+@@ -986,11 +991,6 @@ void __init start_xen(unsigned long boot_phys_offset,
+     platform_init();
+     PROFILE_END();
+ 
+-    PROFILE_START("preinit_xen_time");
+-    preinit_xen_time();
+-    PROFILE_END();
+-    init_timer_flag = 1;
+-
+     PROFILE_START("gic_preinit");
+     gic_preinit();
+     PROFILE_END();
+-- 
+2.34.1
+

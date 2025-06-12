@@ -1,0 +1,25 @@
+env delete bootargs
+
+# Configure PCIe clocks
+i2c dev 0
+i2c mw 0x6c 0x26 5
+i2c mw 0x6c 0x254.2 0x1e
+i2c mw 0x6c 0x258.2 0x1e
+i2c mw 0x20 0x3.1 0xfe
+
+# Read images from eMMC
+load scsi 0:1 0x48000000 xen.dtb
+load scsi 0:1 0x84000000 uInitramfs
+load scsi 0:1 0x7a000000 Image
+load scsi 0:1 0x48080000 xen
+load scsi 0:1 0x7c000000 xenpolicy
+
+# Configure boot device in DTS
+fdt addr 0x48000000
+fdt resize
+fdt mknode / boot_dev
+fdt set /boot_dev device sda
+
+# Boot the board
+bootm 0x48080000 0x84000000 0x48000000
+

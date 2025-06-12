@@ -1,0 +1,108 @@
+# parameters:
+  ADD_META_TEST:
+    desc: "Add meta-test layer and some configs"
+    "no":
+      desc: "Nothing to do"
+      default: true
+    "yes":
+      overrides:
+        components:
+          dom0:
+            builder:
+              layers:
+                - "../../../meta-xen-dom0"
+                - "../../../meta-xen-domx"
+              conf:
+                - [IMAGE_INSTALL:append, " xen-tools-xenstat"] # Xentop?
+          domd:
+            builder:
+              layers:
+                - "../../../meta-xen-domd"
+                - "../../../meta-xen-domx"
+              conf:
+                - [IMAGE_INSTALL:append, " iperf3 netperf htop tcpdump coreutils ethtool mmc-utils rt-tests "]
+                - [EXTRA_OECONF:append:pn-xen, " --disable-debug"]
+                - [EXTRA_IMAGE_FEATURES:append, " ssh-server-openssh"]
+          domu:
+            builder:
+              layers:
+                - "../meta-openembedded/meta-networking"
+                - "../../../meta-xen-domu"
+                - "../../../meta-xen-domx"
+              conf:
+                - [IMAGE_INSTALL:append, " iperf3 netperf htop tcpdump libaio coreutils rt-tests ethtool fio"]
+                - [EXTRA_IMAGE_FEATURES:append, " ssh-server-openssh"]
+  DOMU_ROOTFS_RESIZE:
+    desc: "Add meta-test layer and some configs"
+    "no":
+      desc: "Nothing to do"
+      default: true
+    "yes":
+      overrides:
+        images:
+          full:
+            partitions:
+              domu-rootfs:
+                size: 3072 MiB
+  DOMU_ROOTFS_DUPLICATE:
+    desc: "Add meta-test layer and some configs"
+    "no":
+      desc: "Nothing to do"
+      default: true
+    "yes":
+      overrides:
+        images:
+          full:
+            partitions:
+              domu-rootfs2:
+                type: raw_image
+                gpt_type: 0FC63DAF-8483-4772-8E79-3D69D8477DE4 # Linux filesystem data
+                image_path: "%{YOCTOS_WORK_DIR}/%{DOMU_BUILD_DIR}/tmp/deploy/images/%{MACHINE}/rcar-image-minimal-%{MACHINE}.ext4"
+                size: 3072 MiB
+  CHANGE_KERNER_VER:
+    desc: "Change kernel version"
+    "no":
+      desc: "Nothing to do"
+      default: true
+    "yes":
+      overrides:
+        variables:
+          #XT_KERNEL_BRANCH: "v5.10.41/rcar-5.1.7.rc11.2-virtio-xt"
+          #XT_KERNEL_REV: "769ab722739878c3c1aaa1571f6ca996b135f8f6" # VMQ patchset is merged
+
+          XT_KERNEL_BRANCH: "v5.10.41/rcar-5.1.7.rc11.2-virtio-xt-rc1"
+          XT_KERNEL_REV: "1a1c4c84d878a4ad2946ed6c1d49ba2022025f34" # VMQ L3 offload is enabled
+
+  USING_UFS_AS_STORAGE:
+    desc: "Using UFS instead of eMMC/SD card"
+    "no":
+      desc: "Nothing to do"
+      default: true
+      overrides:
+        variables:
+          USE_UFS: "0"
+    "yes":
+      overrides:
+        variables:
+          USE_UFS: "1"
+        components:
+          dom0:
+            builder:
+              conf:
+                - [EXTRA_IMAGECMD_ext4, "-b 4096"]
+          domd:
+            builder:
+              conf:
+                - [EXTRA_IMAGECMD_ext4, "-b 4096"]
+          domu:
+            builder:
+              conf:
+                - [EXTRA_IMAGECMD_ext4, "-b 4096"]
+        images:
+          full:
+            sector_size: 4096
+            partitions:
+              boot:
+                items:
+                  "boot-ufs.uImage": "%{YOCTOS_WORK_DIR}/build-domd/tmp/deploy/images/%{MACHINE}/boot-ufs.uImage"
+

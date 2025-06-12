@@ -1,0 +1,362 @@
+From 813ea9ff31648d26b81ccdbec1d5a2e9d0e854fd Mon Sep 17 00:00:00 2001
+From: Yuya Hamamachi <yuya.hamamachi.sx@renesas.com>
+Date: Thu, 6 Mar 2025 15:38:31 +0900
+Subject: [PATCH] DEBUG
+
+Signed-off-by: Yuya Hamamachi <yuya.hamamachi.sx@renesas.com>
+---
+ xen/arch/arm/setup.c | 146 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 139 insertions(+), 7 deletions(-)
+
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index d5d0792ed4..aae26ac1e1 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -54,6 +54,18 @@
+ #include <xsm/xsm.h>
+ #include <asm/acpi.h>
+ 
++#include <xen/time.h>
++// uint64_t start_time, end_time, duration;
++#define PROFILE_START(func_name) \
++    if(init_timer_flag) start_time = NOW(); \
++    printk("start %s function\n", func_name);
++
++#define PROFILE_END() \
++    if(init_timer_flag) end_time = NOW(); \
++    if(init_timer_flag) duration = end_time - start_time; \
++    printk("took %lu ns\n", duration);
++
++
+ struct bootinfo __initdata bootinfo;
+ 
+ /*
+@@ -857,6 +869,7 @@ static bool __init is_dom0less_mode(void)
+ 
+ size_t __read_mostly dcache_line_bytes;
+ 
++
+ /* C entry point for boot CPU */
+ void __init start_xen(unsigned long boot_phys_offset,
+                       unsigned long fdt_paddr)
+@@ -867,45 +880,77 @@ void __init start_xen(unsigned long boot_phys_offset,
+     struct bootmodule *xen_bootmodule;
+     struct domain *d;
+     int rc;
++    uint64_t start_time, end_time, duration=0, init_timer_flag=0;
++    //PROFILE_START("START start_xen START");
+ 
++    //PROFILE_START("read_dcache_line_bytes");
+     dcache_line_bytes = read_dcache_line_bytes();
++    //PROFILE_END();
+ 
++    //PROFILE_START("percpu_init_areas");
+     percpu_init_areas();
++    //PROFILE_END();
++    //PROFILE_START("set_processor_id");
+     set_processor_id(0); /* needed early, for smp_processor_id() */
++    //PROFILE_END();
+ 
++    //PROFILE_START("setup_virtual_regions");
+     setup_virtual_regions(NULL, NULL);
++    //PROFILE_END();
+     /* Initialize traps early allow us to get backtrace when an error occurred */
++    //PROFILE_START("init_traps");
+     init_traps();
++    //PROFILE_END();
+ 
++    //PROFILE_START("setup_pagetables");
+     setup_pagetables(boot_phys_offset);
++    //PROFILE_END();
+ 
++    //PROFILE_START("smp_clear_cpu_maps");
+     smp_clear_cpu_maps();
++    //PROFILE_END();
+ 
++    PROFILE_START("early_fdt_map");
+     device_tree_flattened = early_fdt_map(fdt_paddr);
+     if ( !device_tree_flattened )
+         panic("Invalid device tree blob at physical address %#lx.\n"
+               "The DTB must be 8-byte aligned and must not exceed 2 MB in size.\n\n"
+               "Please check your bootloader.\n",
+               fdt_paddr);
++    PROFILE_END();
+ 
+     /* Register Xen's load address as a boot module. */
++    PROFILE_START("add_boot_module");
+     xen_bootmodule = add_boot_module(BOOTMOD_XEN,
+                              (paddr_t)(uintptr_t)(_start + boot_phys_offset),
+                              (paddr_t)(uintptr_t)(_end - _start), false);
+     BUG_ON(!xen_bootmodule);
++    PROFILE_END();
+ 
++    PROFILE_START("boot_fdt_info");
+     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
++    PROFILE_END();
+ 
++    PROFILE_START("boot_fdt_cmdline");
+     cmdline = boot_fdt_cmdline(device_tree_flattened);
+     printk("Command line: %s\n", cmdline);
++    PROFILE_END();
++    PROFILE_START("cmdline_parse");
+     cmdline_parse(cmdline);
++    PROFILE_END();
+ 
++    PROFILE_START("setup_mm");
+     setup_mm();
++    PROFILE_END();
+ 
+     /* Parse the ACPI tables for possible boot-time configuration */
++    PROFILE_START("acpi_boot_table_init");
+     acpi_boot_table_init();
++    PROFILE_END();
+ 
++    PROFILE_START("end_boot_allocator");
+     end_boot_allocator();
++    PROFILE_END();
+ 
+     /*
+      * The memory subsystem has been initialized, we can now switch from
+@@ -913,13 +958,19 @@ void __init start_xen(unsigned long boot_phys_offset,
+      */
+     system_state = SYS_STATE_boot;
+ 
++    PROFILE_START("vm_init");
+     vm_init();
++    PROFILE_END();
+ 
+     if ( acpi_disabled )
+     {
+         printk("Booting using Device Tree\n");
++    PROFILE_START("relocate_fdt");
+         device_tree_flattened = relocate_fdt(fdt_paddr, fdt_size);
++    PROFILE_END();
++    PROFILE_START("dt_unflatten_host_device_tree");
+         dt_unflatten_host_device_tree();
++    PROFILE_END();
+     }
+     else
+     {
+@@ -927,22 +978,43 @@ void __init start_xen(unsigned long boot_phys_offset,
+         device_tree_flattened = NULL;
+     }
+ 
++    PROFILE_START("init_IRQ");
+     init_IRQ();
++    PROFILE_END();
+ 
++    PROFILE_START("platform_init");
+     platform_init();
++    PROFILE_END();
+ 
++    PROFILE_START("preinit_xen_time");
+     preinit_xen_time();
++    PROFILE_END();
++    init_timer_flag = 1;
+ 
++    PROFILE_START("gic_preinit");
+     gic_preinit();
++    PROFILE_END();
+ 
++    PROFILE_START("arm_uart_init");
+     arm_uart_init();
++    PROFILE_END();
++    PROFILE_START("console_init_preirq");
+     console_init_preirq();
++    PROFILE_END();
++    PROFILE_START("console_init_ring");
+     console_init_ring();
++    PROFILE_END();
+ 
++    PROFILE_START("processor_id");
+     processor_id();
++    PROFILE_END();
+ 
++    PROFILE_START("smp_init_cpus");
+     smp_init_cpus();
++    PROFILE_END();
++    PROFILE_START("smp_get_max_cpus");
+     cpus = smp_get_max_cpus();
++    PROFILE_END();
+     printk(XENLOG_INFO "SMP: Allowing %u CPUs\n", cpus);
+     nr_cpu_ids = cpus;
+ 
+@@ -950,13 +1022,21 @@ void __init start_xen(unsigned long boot_phys_offset,
+      * Some errata relies on SMCCC version which is detected by psci_init()
+      * (called from smp_init_cpus()).
+      */
++    PROFILE_START("check_local_cpu_errata");
+     check_local_cpu_errata();
++    PROFILE_END();
+ 
++    PROFILE_START("init_xen_time");
+     init_xen_time();
++    PROFILE_END();
+ 
++    PROFILE_START("gic_init");
+     gic_init();
++    PROFILE_END();
+ 
++    PROFILE_START("tasklet_subsys_init");
+     tasklet_subsys_init();
++    PROFILE_END();
+ 
+     if ( xsm_dt_init() != 1 )
+         warning_add("WARNING: SILO mode is not enabled.\n"
+@@ -964,28 +1044,53 @@ void __init start_xen(unsigned long boot_phys_offset,
+                     "unless the communications have been forbidden between\n"
+                     "untrusted domains.\n");
+ 
++    PROFILE_START("init_maintenance_interrupt");
+     init_maintenance_interrupt();
++    PROFILE_END();
++    PROFILE_START("init_timer_interrupt");
+     init_timer_interrupt();
++    PROFILE_END();
+ 
++    PROFILE_START("timer_init");
+     timer_init();
++    PROFILE_END();
+ 
++    PROFILE_START("init_idle_domain");
+     init_idle_domain();
++    PROFILE_END();
+ 
++    PROFILE_START("rcu_init");
+     rcu_init();
++    PROFILE_END();
+ 
++    PROFILE_START("setup_system_domains");
+     setup_system_domains();
++    PROFILE_END();
+ 
++    PROFILE_START("local_irq_enable");
+     local_irq_enable();
++    PROFILE_END();
++    PROFILE_START("local_abort_enable");
+     local_abort_enable();
++    PROFILE_END();
+ 
++    PROFILE_START("smp_prepare_cpus");
+     smp_prepare_cpus();
++    PROFILE_END();
+ 
++    PROFILE_START("initialize_keytable");
+     initialize_keytable();
++    PROFILE_END();
+ 
++    PROFILE_START("console_init_postirq");
+     console_init_postirq();
++    PROFILE_END();
+ 
++    PROFILE_START("do_presmp_initcalls");
+     do_presmp_initcalls();
++    PROFILE_END();
+ 
++    PROFILE_START("for_each_present_cpu");
+     for_each_present_cpu ( i )
+     {
+         if ( (num_online_cpus() < cpus) && !cpu_online(i) )
+@@ -995,8 +1100,11 @@ void __init start_xen(unsigned long boot_phys_offset,
+                 printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+         }
+     }
++    PROFILE_END();
+ 
++    PROFILE_START("num_online_cpus");
+     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
++    PROFILE_END();
+     /* TODO: smp_cpus_done(); */
+ 
+     /* This should be done in a vpmu driver but we do not have one yet. */
+@@ -1007,26 +1115,38 @@ void __init start_xen(unsigned long boot_phys_offset,
+      * to gather requirements regarding the maximum IPA bits supported by
+      * each IOMMU device.
+      */
++    PROFILE_START("iommu_setup");
+     rc = iommu_setup();
+     if ( !iommu_enabled && rc != -ENODEV )
+         panic("Couldn't configure correctly all the IOMMUs.\n");
++    PROFILE_END();
+ 
++    PROFILE_START("setup_virt_paging");
+     setup_virt_paging();
++    PROFILE_END();
+ 
++    PROFILE_START("do_initcalls");
+     do_initcalls();
++    PROFILE_END();
+ 
+     /*
+      * It needs to be called after do_initcalls to be able to use
+      * stop_machine (tasklets initialized via an initcall).
+      */
++    PROFILE_START("apply_alternatives_all");
+     apply_alternatives_all();
++    PROFILE_END();
++    PROFILE_START("enable_errata_workarounds");
+     enable_errata_workarounds();
++    PROFILE_END();
+ 
+     /* Create initial domain 0. */
++    PROFILE_START("create_dom0");
+     if ( !is_dom0less_mode() )
+         create_dom0();
+     else
+         printk(XENLOG_INFO "Xen dom0less mode detected\n");
++    PROFILE_END();
+ 
+     if ( acpi_disabled )
+         create_domUs();
+@@ -1035,29 +1155,41 @@ void __init start_xen(unsigned long boot_phys_offset,
+      * This needs to be called **before** heap_init_late() so modules
+      * will be scrubbed (unless suppressed).
+      */
++    PROFILE_START("discard_initial_modules");
+     discard_initial_modules();
+-
++    PROFILE_END();
++    PROFILE_START("heap_init_late");
+     heap_init_late();
+-
++    PROFILE_END();
++    PROFILE_START("init_trace_bufs");
+     init_trace_bufs();
+-
++    PROFILE_END();
++    PROFILE_START("init_constructors");
+     init_constructors();
+-
++    PROFILE_END();
++    PROFILE_START("console_endboot");
+     console_endboot();
+-
++    PROFILE_END();
+     /* Hide UART from DOM0 if we're using it */
++    PROFILE_START("serial_endboot");
+     serial_endboot();
+-
++    PROFILE_END();
+     system_state = SYS_STATE_active;
+ 
++    PROFILE_START("domain_unpause_by_systemcontroller");
+     for_each_domain( d )
+         domain_unpause_by_systemcontroller(d);
+-
++    PROFILE_END();
+     /* Switch on to the dynamically allocated stack for the idle vcpu
+      * since the static one we're running on is about to be freed. */
++    PROFILE_START("memcpy");
+     memcpy(idle_vcpu[0]->arch.cpu_info, get_cpu_info(),
+            sizeof(struct cpu_info));
++    PROFILE_END();
++    PROFILE_START("switch_stack_and_jump");
+     switch_stack_and_jump(idle_vcpu[0]->arch.cpu_info, init_done);
++    PROFILE_END();
++    PROFILE_START("END start_xen END");
+ }
+ 
+ void arch_get_xen_caps(xen_capabilities_info_t *info)
+-- 
+2.34.1
+
