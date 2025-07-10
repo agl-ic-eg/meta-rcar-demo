@@ -14,6 +14,8 @@
                 - "../../../meta-xen-domx"
               conf:
                 - [IMAGE_INSTALL:append, " xen-tools-xenstat"] # Xentop?
+                - [EXTRA_IMAGE_FEATURES:append, " ssh-server-openssh"]
+                - [IMAGE_INSTALL:append, " xen-tools-xentrace"]
           domd:
             builder:
               layers:
