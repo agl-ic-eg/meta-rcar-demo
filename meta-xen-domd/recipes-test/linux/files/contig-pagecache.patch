@@ -1,0 +1,115 @@
+diff --git a/mm/readahead.c b/mm/readahead.c
+index c5b0457415be..c85dc355eff3 100644
+--- a/mm/readahead.c
++++ b/mm/readahead.c
+@@ -157,6 +157,52 @@ static void read_pages(struct readahead_control *rac, struct list_head *pages,
+ 		rac->_index++;
+ }
+ 
++/*
++ * Contiguous chunk helper for readahead:
++ * - We allocate up to MAX_ORDER_NR_PAGES pages at once via alloc_pages_exact().
++ * - Pages are consumed one-by-one. Unused tail pages are returned with put_page().
++ * - Never call free_pages_exact() on a partially-consumed chunk.
++ */
++struct ra_chunk {
++	struct page *base;  /* first page of the chunk */
++	unsigned long  nr;  /* total pages in this chunk */
++	unsigned long  off; /* next index to consume (0..nr) */
++};
++
++static inline void ra_chunk_reset(struct ra_chunk *cc)
++{
++	cc->base = NULL;
++	cc->nr = 0;
++	cc->off = 0;
++}
++
++/* Try to (re)fill the chunk with up to 'want' pages (clamped to MAX_ORDER_NR_PAGES) */
++static int ra_chunk_refill(struct ra_chunk *cc, gfp_t gfp_mask, unsigned long want)
++{
++	unsigned long n = min_t(unsigned long, want, MAX_ORDER_NR_PAGES);
++	void *area;
++
++	if (!n)
++		return -EINVAL;
++	area = alloc_pages_exact(n * PAGE_SIZE, gfp_mask);
++	if (!area)
++		return -ENOMEM;
++
++	cc->base = virt_to_page(area);
++	cc->nr   = n;
++	cc->off  = 0;
++	return 0;
++}
++
++static void ra_chunk_put_unused(struct ra_chunk *cc)
++{
++	if (!cc->base)
++		return;
++	while (cc->off < cc->nr)
++		put_page(cc->base + cc->off++);
++	ra_chunk_reset(cc);
++}
++
+ /**
+  * page_cache_ra_unbounded - Start unchecked readahead.
+  * @ractl: Readahead control.
+@@ -192,11 +238,17 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
+ 	 */
+ 	unsigned int nofs = memalloc_nofs_save();
+ 
++	/* Try to allocate pages in contiguous chunks of up to MAX_ORDER_NR_PAGES. */
++	bool use_chunks = true;
++	struct ra_chunk chunk;
++	ra_chunk_reset(&chunk);
++
+ 	/*
+ 	 * Preallocate as many pages as we will need.
+ 	 */
+ 	for (i = 0; i < nr_to_read; i++) {
+ 		struct page *page = xa_load(&mapping->i_pages, index + i);
++		unsigned long remain = nr_to_read - i;
+ 
+ 		BUG_ON(index + i != ractl->_index + ractl->_nr_pages);
+ 
+@@ -213,7 +265,26 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
+ 			continue;
+ 		}
+ 
+-		page = __page_cache_alloc(gfp_mask);
++		/*
++		 * Obtain a page, first from a contiguous chunk, else
++		 * fallback per-page.
++		 */
++		if (use_chunks) {
++			if (!chunk.base || chunk.off == chunk.nr) {
++				/*
++				 * Refill with up to MAX_ORDER_NR_PAGES or
++				 * the remaining needed pages.
++				 */
++				if (remain == 1 ||
++				    ra_chunk_refill(&chunk, gfp_mask, remain))
++					use_chunks = false;
++			}
++		}
++		if (use_chunks)
++			page = chunk.base + chunk.off++;
++		else
++			page = __page_cache_alloc(gfp_mask);
++
+ 		if (!page)
+ 			break;
+ 		if (mapping->a_ops->readpages) {
+@@ -236,6 +307,11 @@ void page_cache_ra_unbounded(struct readahead_control *ractl,
+ 	 * will then handle the error.
+ 	 */
+ 	read_pages(ractl, &page_pool, false);
++
++	/* Return any unused pages in the current contiguous chunk. */
++	if (use_chunks)
++		ra_chunk_put_unused(&chunk);
++
+ 	memalloc_nofs_restore(nofs);
+ }
+ EXPORT_SYMBOL_GPL(page_cache_ra_unbounded);
