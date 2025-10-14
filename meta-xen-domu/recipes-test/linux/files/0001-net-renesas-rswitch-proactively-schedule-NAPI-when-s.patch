@@ -1,0 +1,85 @@
+From 5752dd731eb4dc9e3f0e403c0781dcbe0d88321f Mon Sep 17 00:00:00 2001
+From: Koichiro Den <den@valinux.co.jp>
+Date: Fri, 5 Sep 2025 17:14:19 +0900
+Subject: [PATCH] net: renesas: rswitch: proactively schedule NAPI when
+ stopping TX queue
+
+During multi-VM UDP TX saturation (Xen DomUs with a DomD doing software
+forwarding via vmq interfaces), persistent TX stalls were observed.
+Once the queue was stopped, only unrelated RX traffic (e.g. ping the
+DomUs) appears to be able to re-arm NAPI and reclaim TX completions.
+This implies that the final TX interrupt may occasionally be missed.
+
+AFAIU the vmq front-tx/back-rx co-operates with the help of grant table
+as each side sees a different chain. The xenfront side TX completion is
+inherently irrelevant to the back-rx timing and kicking the xenfront
+from xenback after its NAPI poll would be needed.
+
+Fix this by explicitly scheduling NAPI when we stop the TX subqueue, so
+that the poller promptly runs rswitch_tx_free() to reclaim descriptors
+and call netif_wake_subqueue(), ensuring forward progress without
+waiting for an external interrupt that might never fire. The vmq
+infrastructure is like a virtual NIC and irq for TX completion can be
+lost for any trivial reasons.
+
+Signed-off-by: Koichiro Den <den@valinux.co.jp>
+---
+ drivers/net/ethernet/renesas/rswitch.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/renesas/rswitch.c b/drivers/net/ethernet/renesas/rswitch.c
+index 3a2308f9b771..d5c8977d916e 100644
+--- a/drivers/net/ethernet/renesas/rswitch.c
++++ b/drivers/net/ethernet/renesas/rswitch.c
+@@ -2414,6 +2414,15 @@ static struct rswitch_device *get_dev_by_ip(struct rswitch_private *priv, u32 ip
+ 	return NULL;
+ }
+ 
++static void rswitch_stop_queue(struct net_device *ndev)
++{
++	struct rswitch_device *rdev = ndev_to_rdev(ndev);
++
++	netif_stop_subqueue(ndev, 0);
++	if (napi_schedule_prep(&rdev->napi))
++		__napi_schedule_irqoff(&rdev->napi);
++}
++
+ static int rswitch_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ {
+ 	struct rswitch_device *rdev = ndev_to_rdev(ndev);
+@@ -2432,7 +2441,7 @@ static int rswitch_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	num_desc = skb->len % MAX_DESC_SZ ? skb->len / MAX_DESC_SZ + 1 : skb->len / MAX_DESC_SZ;
+ 
+ 	if (c->cur - c->dirty > c->num_ring - num_desc) {
+-		netif_stop_subqueue(ndev, 0);
++		rswitch_stop_queue(ndev);
+ 		ret = NETDEV_TX_BUSY;
+ 		goto out;
+ 	}
+@@ -2448,7 +2457,7 @@ static int rswitch_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 					READ_ONCE(rdev->vmq_info->front_rx));
+ 		}
+ 		if (num_desc > rx_chain_free) {
+-			netif_stop_subqueue(ndev, 0);
++			rswitch_stop_queue(ndev);
+ 			ret = NETDEV_TX_BUSY;
+ 			goto out;
+ 		}
+@@ -2554,12 +2563,12 @@ static int rswitch_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	 * it's better to stop tx subqueue now without returning error.
+ 	 */
+ 	if (unlikely(c->cur - c->dirty >= c->num_ring))
+-		netif_stop_subqueue(ndev, 0);
++		rswitch_stop_queue(ndev);
+ 
+ 	if (unlikely((rdev->rdev_type == RSWITCH_VMQ_BACK_DEV ||
+ 		      rdev->rdev_type == RSWITCH_VMQ_FRONT_DEV) &&
+ 		      (rx_chain_free - num_desc) < 1))
+-		netif_stop_subqueue(ndev, 0);
++		rswitch_stop_queue(ndev);
+ out:
+ 	spin_unlock_irqrestore(&rdev->lock, flags);
+ 
+-- 
+2.48.1
+
