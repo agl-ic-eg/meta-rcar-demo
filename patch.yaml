@@ -22,7 +22,7 @@
                 - "../../../meta-xen-domd"
                 - "../../../meta-xen-domx"
               conf:
-                - [IMAGE_INSTALL:append, " iperf3 netperf htop tcpdump coreutils ethtool mmc-utils rt-tests "]
+                - [IMAGE_INSTALL:append, " iperf3 netperf htop tcpdump coreutils ethtool mmc-utils rt-tests fio"]
                 - [EXTRA_OECONF:append:pn-xen, " --disable-debug"]
                 - [EXTRA_IMAGE_FEATURES:append, " ssh-server-openssh"]
           domu:
